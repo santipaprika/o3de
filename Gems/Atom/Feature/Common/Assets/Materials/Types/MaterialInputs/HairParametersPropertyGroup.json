@@ -1,0 +1,33 @@
+{
+    "name": "hair",
+    "displayName": "Hair parameters",
+    "description": "Properties to control hair-specific rendering behavior",
+    "properties": [
+        {
+            "name": "longitudinalRoughness",
+            "displayName": "Longitudinal Roughness",
+            "description": "Roughness for the longitudinal scattering in hair strands.",
+            "type": "float",
+            "defaultValue": 1.0,
+            "min": 0.0,
+            "softMax": 2.0,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_longitudinalRoughness"
+            }
+        },
+        {
+            "name": "azimuthalRoughness",
+            "displayName": "Azimuthal Roughness",
+            "description": "Roughness for the azimuthal scattering in hair strands.",
+            "type": "float",
+            "defaultValue": 1.0,
+            "min": 0.0,
+            "softMax": 2.0,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_azimuthalRoughness"
+            }
+        }
+    ]
+}

@@ -1,0 +1,60 @@
+{
+    "description": "Material Type tailored for rendering hairs, with support for refraction, occlusions, and other hair-specific properties.",
+    "version": 1,
+    "propertyLayout": {
+        "propertyGroups": [
+            {
+                "$import": "MaterialInputs/BaseColorPropertyGroup.json"
+            },
+            {
+                "$import": "MaterialInputs/NormalPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/HairParametersPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/RoughnessPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/SpecularPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/OcclusionPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/OpacityPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/UvPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/SubsurfaceAndTransmissionPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/GeneralCommonPropertyGroup.json"
+            }
+        ]
+    },
+    "shaders": [
+        {
+            "file": "./Hair.shader",
+            "tag": "ForwardPass_EDS"
+        },
+        {
+            "file": "Shaders/Shadow/Shadowmap.shader",
+            "tag": "Shadowmap"
+        },
+        {
+            "file": "Shaders/Depth/DepthPass.shader",
+            "tag": "DepthPass"
+        },
+        {
+            "file": "Shaders/MotionVector/MeshMotionVector.shader",
+            "tag": "MeshMotionVector"
+        }
+    ],
+    "uvNameMap": {
+        "UV0": "Tiled",
+        "UV1": "Unwrapped"
+    }
+}

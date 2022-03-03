@@ -1,0 +1,69 @@
+/*
+ * Copyright (c) Contributors to the Open 3D Engine Project.
+ * For complete copyright and license terms please see the LICENSE at the root of this distribution.
+ *
+ * SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ */
+
+#include <Atom/Features/PBR/Surfaces/HairSurface.azsli>
+#include <Atom/Features/MatrixUtility.azsli>
+
+void EvaluateHairSurface(
+    float3 normal,
+    float2 uv[UvSetCount],
+    float3 tangents[UvSetCount],
+    float3 bitangents[UvSetCount],
+    bool isFrontFace,
+    inout Surface surface,
+    out SurfaceSettings surfaceSettings)
+{
+    // ------- Normal -------
+    
+    float2 normalUv = uv[MaterialSrg::m_normalMapUvIndex];
+    float3x3 uvMatrix = MaterialSrg::m_normalMapUvIndex == 0 ? MaterialSrg::m_uvMatrix : CreateIdentity3x3(); // By design, only UV0 is allowed to apply transforms.
+    surface.normal = GetNormalInputWS(MaterialSrg::m_normalMap, MaterialSrg::m_sampler, normalUv, MaterialSrg::m_flipNormalX, MaterialSrg::m_flipNormalY, isFrontFace, normal,
+                                       tangents[MaterialSrg::m_normalMapUvIndex], bitangents[MaterialSrg::m_normalMapUvIndex], uvMatrix, o_normal_useTexture, MaterialSrg::m_normalFactor);
+
+    //--------------------- Base Color ----------------------
+
+    float2 baseColorUv = uv[MaterialSrg::m_baseColorMapUvIndex];
+    float3 sampledColor = GetBaseColorInput(MaterialSrg::m_baseColorMap, MaterialSrg::m_sampler, baseColorUv, MaterialSrg::m_baseColor.rgb, o_baseColor_useTexture);
+    float3 baseColor = BlendBaseColor(sampledColor, MaterialSrg::m_baseColor.rgb, MaterialSrg::m_baseColorFactor, o_baseColorTextureBlendMode, o_baseColor_useTexture);
+
+    // ------- Specular -------
+
+    float2 specularUv = uv[MaterialSrg::m_specularF0MapUvIndex];
+    float specularF0Factor = GetSpecularInput(MaterialSrg::m_specularF0Map, MaterialSrg::m_sampler, specularUv, MaterialSrg::m_specularF0Factor, o_specularF0_useTexture);
+
+    surface.SetAlbedoAndSpecularF0(baseColor, specularF0Factor);
+
+    // ------- Roughness -------
+
+    float2 roughnessUv = uv[MaterialSrg::m_roughnessMapUvIndex];
+    surface.roughnessLinear = GetRoughnessInput(MaterialSrg::m_roughnessMap, MaterialSrg::m_sampler, roughnessUv, MaterialSrg::m_roughnessFactor,
+                                        MaterialSrg::m_roughnessLowerBound, MaterialSrg::m_roughnessUpperBound, o_roughness_useTexture);
+    surface.CalculateRoughnessA();
+
+    // ------- Hair Strand Roughness -------
+
+    surface.longitudinalRoughness = MaterialSrg::m_longitudinalRoughness;
+    surface.azimuthalRoughness = MaterialSrg::m_azimuthalRoughness;
+
+    // ------- Subsurface -------
+
+    float2 subsurfaceUv = uv[MaterialSrg::m_subsurfaceScatteringInfluenceMapUvIndex];
+    surface.subsurfaceScatteringFactor = GetSubsurfaceInput(MaterialSrg::m_subsurfaceScatteringInfluenceMap, MaterialSrg::m_sampler, subsurfaceUv, MaterialSrg::m_subsurfaceScatteringFactor);
+
+    // ------- Transmission -------
+
+    float2 transmissionUv = uv[MaterialSrg::m_transmissionThicknessMapUvIndex];
+    float4 transmissionTintThickness = GeTransmissionInput(MaterialSrg::m_transmissionThicknessMap, MaterialSrg::m_sampler, transmissionUv, MaterialSrg::m_transmissionTintThickness);
+    surface.transmission.tint = transmissionTintThickness.rgb;
+    surface.transmission.thickness = transmissionTintThickness.w;
+    surface.transmission.transmissionParams = MaterialSrg::m_transmissionParams;
+    surface.transmission.scatterDistance = MaterialSrg::m_scatterDistance;
+
+    // ------- Opacity -------
+    surfaceSettings.opacityAffectsSpecularFactor = MaterialSrg::m_opacityAffectsSpecularFactor;
+}
