@@ -14,6 +14,7 @@
 // Then include custom surface and lighting data types
 #include <Atom/Features/PBR/Lighting/LightingData.azsli>
 #include <Atom/Features/PBR/Surfaces/HairSurface.azsli>
+#include <Atom/Features/PBR/Lighting/HairMarschner.azsli>
 
 #include <Atom/Features/PBR/LightingUtils.azsli>
 #include <Atom/Features/PBR/Microfacet/Brdf.azsli>
@@ -30,7 +31,10 @@ float3 GetDiffuseLighting(Surface surface, LightingData lightingData, float3 lig
     float thetaR = dot(lightingData.dirToCamera, surface.normal);
 
     float halfAngle = (thetaI + thetaR) * 0.5;
-    //float M_R = GaussianNormalized(surface.longitudinalRoughness, surface)
+    
+    // Contribution of longitudinal scattering for the reflected lobe
+    // float M_R = GaussianNormalized(surface.longitudinalRoughness, surface);
+
     
     float3 diffuse;
     if(o_enableSubsurfaceScattering)
@@ -51,6 +55,9 @@ float3 GetSpecularLighting(Surface surface, LightingData lightingData, const flo
 {
     float3 specular = SpecularGGX(lightingData.dirToCamera, dirToLight, surface.normal, surface.specularF0, lightingData.NdotV, surface.roughnessA2, lightingData.multiScatterCompensation);
     specular *= lightIntensity;
+
+
+
     return specular;
 }
 
