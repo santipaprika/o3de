@@ -9,7 +9,7 @@
 #include <Atom/Features/PBR/ForwardPassSrg.azsli>
 
 // Pass Output
-#include <Atom/Features/PBR/ForwardSubsurfacePassOutput.azsli>
+#include <Atom/Features/PBR/ForwardPassOutput.azsli>
 
 // Utility
 #include <Atom/Features/ColorManagement/TransformColor.azsli>
@@ -20,6 +20,7 @@
 
 // Decals
 #include <Atom/Features/PBR/Decals.azsli>
+
 
 // ---------- Vertex Shader ----------
 
@@ -32,19 +33,20 @@ struct VSInput
     float3 m_bitangent : BITANGENT; 
  
     // Extended fields (only referenced in this azsl file)...
-    float2 m_uv0_tiled : UV0;
-    float2 m_uv1_unwrapped : UV1;
+    float2 m_uv0 : UV0;
+    float2 m_uv1 : UV1;
 };
 
 struct VSOutput
 {
     // Base fields (required by the template azsli file)...
+    // "centroid" is needed for SV_Depth to compile
     precise linear centroid float4 m_position : SV_Position;
     float3 m_normal: NORMAL;
     float3 m_tangent : TANGENT; 
     float3 m_bitangent : BITANGENT; 
     float3 m_worldPosition : UV0;
-    float3 m_shadowCoords[ViewSrg::MaxCascadeCount] : UV4;
+    float3 m_shadowCoords[ViewSrg::MaxCascadeCount] : UV3;
 
     // Extended fields (only referenced in this azsl file)...
     float2 m_uv[UvSetCount] : UV1;
@@ -55,18 +57,31 @@ struct VSOutput
 VSOutput HairVS(VSInput IN)
 {
     VSOutput OUT;
- 
-    float3 worldPosition = mul(ObjectSrg::GetWorldMatrix(), float4(IN.m_position, 1.0)).xyz;
- 
-    // UV0 is for tiled UVs. 
-    // Even though the "unwrapped" stream is considered the main stream from a material perspective, we
-    // still define UV0 in order to match the default UV set order in most DCC tools for higher compatibility.
-    OUT.m_uv[0] = IN.m_uv0_tiled;
 
-    // UV1 is for unwrapped UVs. The main textures in the Hair material will almost always use this UV set.
-    OUT.m_uv[1] = IN.m_uv1_unwrapped;
+    float4x4 objectToWorld = GetObjectToWorld();
+    float4 worldPosition = mul(objectToWorld, float4(IN.m_position, 1.0));
+    OUT.m_worldPosition = worldPosition.xyz;
+    OUT.m_position = mul(ViewSrg::m_viewProjectionMatrix, worldPosition);
 
-    VertexHelper(IN, OUT, worldPosition, false);
+    float2 uvs[UvSetCount] = { IN.m_uv0, IN.m_uv1 };
+    TransformUvs(uvs, OUT.m_uv);
+
+    // Shadow coords will be calculated in the pixel shader in this case
+    bool skipShadowCoords = ShouldHandleParallax() && o_parallax_enablePixelDepthOffset;
+
+    float3x3 objectToWorldIT = GetNormalToWorld();
+    ConstructTBN(IN.m_normal, IN.m_tangent, IN.m_bitangent, objectToWorld, objectToWorldIT, OUT.m_normal, OUT.m_tangent, OUT.m_bitangent);
+
+    // directional light shadow 
+    const uint shadowIndex = ViewSrg::m_shadowIndexDirectionalLight;
+    if (o_enableShadows && !skipShadowCoords && shadowIndex < SceneSrg::m_directionalLightCount)
+    {
+        DirectionalLightShadow::GetShadowCoords(
+            shadowIndex,
+            worldPosition,
+            OUT.m_normal,
+            OUT.m_shadowCoords);
+    }
 
     return OUT;
 }
@@ -74,16 +89,15 @@ VSOutput HairVS(VSInput IN)
 
 // ---------- Pixel Shader ----------
 
-PbrLightingOutput HairPS_Common(VSOutput IN)
+PbrLightingOutput HairPS_Common(VSOutput IN, bool isFrontFace, out float depthNDC)
 {
-    // [TODO] check front face
-    const bool isFrontFace = true;
+    const float3 vertexNormal = normalize(IN.m_normal);
 
-    // ------- Tangents & Bitangets -------
-    float3 tangents[UvSetCount] = { IN.m_tangent.xyz, IN.m_tangent.xyz };
-    float3 bitangents[UvSetCount] = { IN.m_bitangent.xyz, IN.m_bitangent.xyz };
+    // ------- Tangents & Bitangents -------
+    float3 tangents[UvSetCount] = { IN.m_tangent, IN.m_tangent };
+    float3 bitangents[UvSetCount] = { IN.m_bitangent, IN.m_bitangent };
 
-    if (o_normal_useTexture)
+    if (ShouldHandleParallax() || o_normal_useTexture)
     {
         for (int i = 0; i != UvSetCount; ++i)
         {
@@ -99,17 +113,47 @@ PbrLightingOutput HairPS_Common(VSOutput IN)
                 bitangents[i]);
         }
     }
-    
+
+    // ------- Depth & Parallax -------
+
+    depthNDC = IN.m_position.z;
+    bool displacementIsClipped = false;
+
+    if(ShouldHandleParallax())
+    {
+        SetPixelDepth(
+            IN.m_worldPosition,
+            IN.m_normal,
+            tangents,
+            bitangents,
+            IN.m_uv,
+            isFrontFace,
+            IN.m_position.w,
+            depthNDC,
+            displacementIsClipped);
+
+        // Adjust directional light shadow coordinates for parallax correction
+        if(o_parallax_enablePixelDepthOffset)
+        {
+            const uint shadowIndex = ViewSrg::m_shadowIndexDirectionalLight;
+            if (o_enableShadows && shadowIndex < SceneSrg::m_directionalLightCount)
+            {
+                DirectionalLightShadow::GetShadowCoords(shadowIndex, IN.m_worldPosition, vertexNormal, IN.m_shadowCoords);
+            }
+        }
+    }
+
     SurfaceSettings surfaceSettings;
     Surface surface;
-    surface.position = IN.m_worldPosition;
-    surface.vertexNormal = normalize(IN.m_normal);
+    surface.vertexNormal = vertexNormal;
+    surface.position = IN.m_worldPosition.xyz;
+    surface.tangent = IN.m_bitangent;
 
     // ------- Alpha & Clip -------
     // TODO: this often invokes a separate sample of the base color texture which is wasteful
     float alpha = GetAlphaAndClip(IN.m_uv);
 
-    EvaluateHairSurface(IN.m_normal, IN.m_uv, tangents, bitangents, isFrontFace, surface, surfaceSettings);
+    EvaluateHairSurface(IN.m_normal, IN.m_uv, tangents, bitangents, isFrontFace, displacementIsClipped, surface, surfaceSettings);
 
     // ------- Lighting Data -------
 
@@ -122,31 +166,19 @@ PbrLightingOutput HairPS_Common(VSOutput IN)
     // Directional light shadow coordinates
     lightingData.shadowCoords = IN.m_shadowCoords;
 
+    // Surface lighting properties
+    lightingData.diffuseAmbientOcclusion = surface.diffuseAmbientOcclusion;
+    lightingData.specularOcclusion = surface.specularOcclusion;
+
     // Diffuse and Specular response (used in IBL calculations)
     lightingData.specularResponse = FresnelSchlickWithRoughness(lightingData.NdotV, surface.specularF0, surface.roughnessLinear);
     lightingData.diffuseResponse = 1.0 - lightingData.specularResponse;
 
-    // ------- Thin Object Light Transmission -------
+    // ------- Multiscatter -------
 
-    // Shrink (absolute) offset towards the normal opposite direction to ensure correct shadow map projection
-    lightingData.shrinkFactor = surface.transmission.transmissionParams.x;
-
-    // Angle offset for subsurface scattering through thin objects
-    lightingData.transmissionNdLBias = surface.transmission.transmissionParams.y;
-
-    // Attenuation applied to hide artifacts due to low-res shadow maps 
-    lightingData.distanceAttenuation = surface.transmission.transmissionParams.z;
-
-    // ------- Occlusion -------
-    
-    lightingData.diffuseAmbientOcclusion = GetOcclusionInput(MaterialSrg::m_diffuseOcclusionMap, MaterialSrg::m_sampler, IN.m_uv[MaterialSrg::m_diffuseOcclusionMapUvIndex], MaterialSrg::m_diffuseOcclusionFactor, o_diffuseOcclusion_useTexture);
-    lightingData.specularOcclusion = GetOcclusionInput(MaterialSrg::m_specularOcclusionMap, MaterialSrg::m_sampler, IN.m_uv[MaterialSrg::m_specularOcclusionMapUvIndex], MaterialSrg::m_specularOcclusionFactor, o_specularOcclusion_useTexture);
+    lightingData.CalculateMultiscatterCompensation(surface.specularF0, o_specularF0_enableMultiScatterCompensation);
 
     // ------- Lighting Calculation -------
-
-    surface.clearCoat.factor = 0.0;
-    surface.clearCoat.roughness = 0.0;
-    surface.clearCoat.normal = float3(0.0, 0.0, 0.0);
 
     // Apply Decals
     ApplyDecals(lightingData.tileIterator, surface);
@@ -158,16 +190,9 @@ PbrLightingOutput HairPS_Common(VSOutput IN)
     ApplyIBL(surface, lightingData);
 
     // Finalize Lighting
-    lightingData.FinalizeLighting(surface.transmission.tint);
+    lightingData.FinalizeLighting();
 
-    PbrLightingOutput lightingOutput = GetPbrLightingOutput(surface, lightingData);
-        
-    // ------- Preparing output -------
-
-    // Pack factor and quality, drawback: because of precision limit of float16 cannot represent exact 1, maximum representable value is 0.9961
-    uint factorAndQuality = dot(round(float2(saturate(surface.subsurfaceScatteringFactor), MaterialSrg::m_subsurfaceScatteringQuality) * 255), float2(256, 1));
-    lightingOutput.m_diffuseColor.w = factorAndQuality * (o_enableSubsurfaceScattering ? 1.0 : -1.0);
-    lightingOutput.m_scatterDistance = MaterialSrg::m_scatterDistance;
+    PbrLightingOutput lightingOutput = GetPbrLightingOutput(surface, lightingData, alpha);
 
     // ------- Opacity -------
 
@@ -221,7 +246,7 @@ PbrLightingOutput HairPS_Common(VSOutput IN)
         specular = lerp(specular, specular * lightingOutput.m_diffuseColor.w, surfaceSettings.opacityAffectsSpecularFactor);
         lightingOutput.m_diffuseColor.rgb += specular;
 
-        lightingOutput.m_specularColor.rgb = surface.albedo * (1.0 - alpha); 
+        lightingOutput.m_specularColor.rgb = surface.baseColor * (1.0 - alpha); 
     }
     else
     {
@@ -231,19 +256,45 @@ PbrLightingOutput HairPS_Common(VSOutput IN)
     return lightingOutput;
 }
 
-[earlydepthstencil]
-ForwardPassOutput HairPS(VSOutput IN)
+ForwardPassOutputWithDepth HairPS(VSOutput IN, bool isFrontFace : SV_IsFrontFace)
 {
-    ForwardPassOutput OUT;
+    ForwardPassOutputWithDepth OUT;
+    float depth;
 
-    PbrLightingOutput lightingOutput = HairPS_Common(IN);
+    PbrLightingOutput lightingOutput = HairPS_Common(IN, isFrontFace, depth);
 
+#ifdef UNIFIED_FORWARD_OUTPUT
+    OUT.m_color.rgb = lightingOutput.m_diffuseColor.rgb + lightingOutput.m_specularColor.rgb;
+    OUT.m_color.a = lightingOutput.m_diffuseColor.a;
+    OUT.m_depth = depth;
+#else
     OUT.m_diffuseColor = lightingOutput.m_diffuseColor;
     OUT.m_specularColor = lightingOutput.m_specularColor;
     OUT.m_specularF0 = lightingOutput.m_specularF0;
     OUT.m_albedo = lightingOutput.m_albedo;
     OUT.m_normal = lightingOutput.m_normal;
-    OUT.m_scatterDistance = lightingOutput.m_scatterDistance;
+    OUT.m_depth = depth;
+#endif
+    return OUT;
+}
 
+[earlydepthstencil]
+ForwardPassOutput HairPS_EDS(VSOutput IN, bool isFrontFace : SV_IsFrontFace)
+{
+    ForwardPassOutput OUT;
+    float depth;
+
+    PbrLightingOutput lightingOutput = HairPS_Common(IN, isFrontFace, depth);
+
+#ifdef UNIFIED_FORWARD_OUTPUT
+    OUT.m_color.rgb = lightingOutput.m_diffuseColor.rgb + lightingOutput.m_specularColor.rgb;
+    OUT.m_color.a = lightingOutput.m_diffuseColor.a;
+#else
+    OUT.m_diffuseColor = lightingOutput.m_diffuseColor;
+    OUT.m_specularColor = lightingOutput.m_specularColor;
+    OUT.m_specularF0 = lightingOutput.m_specularF0;
+    OUT.m_albedo = lightingOutput.m_albedo;
+    OUT.m_normal = lightingOutput.m_normal;
+#endif
     return OUT;
 }

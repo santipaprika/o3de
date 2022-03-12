@@ -6,27 +6,30 @@
  *
  */
 
+#include "Atom/Features/ShaderQualityOptions.azsli"
+
 #include "Hair_Common.azsli"
 
-// SRGs
 #include <Atom/Features/PBR/DefaultObjectSrg.azsli>
 
 // ---------- Material Parameters ----------
 
 COMMON_OPTIONS_BASE_COLOR()
-COMMON_OPTIONS_NORMAL()
 COMMON_OPTIONS_ROUGHNESS()
 COMMON_OPTIONS_SPECULAR_F0()
+COMMON_OPTIONS_NORMAL()
 COMMON_OPTIONS_OCCLUSION()
-// COMMON_OPTIONS_HAIR()
+// Note COMMON_OPTIONS_PARALLAX is in StandardPBR_Common.azsli because it's needed by all StandardPBR shaders.
 
+// Alpha
 #include "MaterialInputs/AlphaInput.azsli"
 
 #include "MaterialFunctions/EvaluateHairSurface.azsli"
 #include "MaterialFunctions/EvaluateTangentFrame.azsli"
+#include "MaterialFunctions/ParallaxDepth.azsli"
+#include "MaterialFunctions/StandardGetNormalToWorld.azsli"
+#include "MaterialFunctions/StandardGetObjectToWorld.azsli"
 #include "MaterialFunctions/StandardGetAlphaAndClip.azsli"
+#include "MaterialFunctions/StandardTransformUvs.azsli"
 
 #include "HairSurface_ForwardPass.azsli"
-
-
-

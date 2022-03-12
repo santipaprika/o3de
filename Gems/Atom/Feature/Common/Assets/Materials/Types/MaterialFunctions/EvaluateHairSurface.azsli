@@ -15,21 +15,27 @@ void EvaluateHairSurface(
     float3 tangents[UvSetCount],
     float3 bitangents[UvSetCount],
     bool isFrontFace,
+    bool displacementIsClipped,
     inout Surface surface,
     out SurfaceSettings surfaceSettings)
 {
     // ------- Normal -------
-    
+
     float2 normalUv = uv[MaterialSrg::m_normalMapUvIndex];
     float3x3 uvMatrix = MaterialSrg::m_normalMapUvIndex == 0 ? MaterialSrg::m_uvMatrix : CreateIdentity3x3(); // By design, only UV0 is allowed to apply transforms.
     surface.normal = GetNormalInputWS(MaterialSrg::m_normalMap, MaterialSrg::m_sampler, normalUv, MaterialSrg::m_flipNormalX, MaterialSrg::m_flipNormalY, isFrontFace, normal,
                                        tangents[MaterialSrg::m_normalMapUvIndex], bitangents[MaterialSrg::m_normalMapUvIndex], uvMatrix, o_normal_useTexture, MaterialSrg::m_normalFactor);
 
-    //--------------------- Base Color ----------------------
+    // ------- Base Color -------
 
     float2 baseColorUv = uv[MaterialSrg::m_baseColorMapUvIndex];
     float3 sampledColor = GetBaseColorInput(MaterialSrg::m_baseColorMap, MaterialSrg::m_sampler, baseColorUv, MaterialSrg::m_baseColor.rgb, o_baseColor_useTexture);
     float3 baseColor = BlendBaseColor(sampledColor, MaterialSrg::m_baseColor.rgb, MaterialSrg::m_baseColorFactor, o_baseColorTextureBlendMode, o_baseColor_useTexture);
+    
+    if(o_parallax_highlightClipping && displacementIsClipped)
+    {
+        ApplyParallaxClippingHighlight(baseColor);
+    }
 
     // ------- Specular -------
 
@@ -49,21 +55,15 @@ void EvaluateHairSurface(
 
     surface.longitudinalRoughness = MaterialSrg::m_longitudinalRoughness;
     surface.azimuthalRoughness = MaterialSrg::m_azimuthalRoughness;
+    surface.cuticleTilt = MaterialSrg::m_cuticleTilt;
 
-    // ------- Subsurface -------
 
-    float2 subsurfaceUv = uv[MaterialSrg::m_subsurfaceScatteringInfluenceMapUvIndex];
-    surface.subsurfaceScatteringFactor = GetSubsurfaceInput(MaterialSrg::m_subsurfaceScatteringInfluenceMap, MaterialSrg::m_sampler, subsurfaceUv, MaterialSrg::m_subsurfaceScatteringFactor);
+    // ------- Occlusion -------
+    
+    surface.diffuseAmbientOcclusion = GetOcclusionInput(MaterialSrg::m_diffuseOcclusionMap, MaterialSrg::m_sampler, uv[MaterialSrg::m_diffuseOcclusionMapUvIndex], MaterialSrg::m_diffuseOcclusionFactor, o_diffuseOcclusion_useTexture);
+    surface.specularOcclusion = GetOcclusionInput(MaterialSrg::m_specularOcclusionMap, MaterialSrg::m_sampler, uv[MaterialSrg::m_specularOcclusionMapUvIndex], MaterialSrg::m_specularOcclusionFactor, o_specularOcclusion_useTexture);
 
-    // ------- Transmission -------
-
-    float2 transmissionUv = uv[MaterialSrg::m_transmissionThicknessMapUvIndex];
-    float4 transmissionTintThickness = GeTransmissionInput(MaterialSrg::m_transmissionThicknessMap, MaterialSrg::m_sampler, transmissionUv, MaterialSrg::m_transmissionTintThickness);
-    surface.transmission.tint = transmissionTintThickness.rgb;
-    surface.transmission.thickness = transmissionTintThickness.w;
-    surface.transmission.transmissionParams = MaterialSrg::m_transmissionParams;
-    surface.transmission.scatterDistance = MaterialSrg::m_scatterDistance;
-
+    
     // ------- Opacity -------
     surfaceSettings.opacityAffectsSpecularFactor = MaterialSrg::m_opacityAffectsSpecularFactor;
 }

@@ -56,85 +56,83 @@
 
 // Longitudinal functions (M_R, M_TT, M_RTR)
 // Notice that tilt and roughness multipliers are a-priori per Epic artistic taste 
-float M_R(Surface surface, float Lh, float sinLiPlusSinLr)
+float M_R(Surface surface, float Lh)
 {
-    float a = 1.0f * surface.cuticleTilt;   // Tilt is translate as the mean offset
-    float b = 0.5f * surface.roughnessA2;    // Roughness is used as the standard deviation
+    // Based on original Marschner
+    const float tiltFactor = 1.0f;   // Tilt is translate as the mean offset
+    const float roughnessFactor = 1.0f;    // Roughness is used as the standard deviation
 
-//    return GaussianNormalized(sinLiPlusSinLr, a, b);  // reference
-    return GaussianNormalized(Lh, a, b);
+    return GaussianNormalized(Lh, tiltFactor * surface.cuticleTilt, roughnessFactor * surface.longitudinalRoughness);
 }
 
-float M_TT(Surface surface, float Lh, float sinLiPlusSinLr)
+float M_TT(Surface surface, float Lh)
 {
     float a = 1.0f * surface.cuticleTilt;
     float b = 0.5f * surface.roughnessA2;
 
-//    return GaussianNormalized(sinLiPlusSinLr, a, b);  // reference
     return GaussianNormalized(Lh, a, b);
 }
 
-float M_TRT(Surface surface, float Lh, float sinLiPlusSinLr)
+float M_TRT(Surface surface, float Lh)
 {
     float a = 1.5f * surface.cuticleTilt;
     float b = 1.0f * surface.roughnessA2;
 
-//    return GaussianNormalized(sinLiPlusSinLr, a, b);  // reference
     return GaussianNormalized(Lh, a, b);    
 }
 
 
-// Azimuth functions (N_R, N_TT, N_RTR)
-float N_R(Surface surface, float cos_O2, float3 Wi, float3 Wr, float f0)
-{
-    // Fresnel part of the attentuation term (A in the papers)
-    float fresnel = FresnelSchlick( sqrt(0.5 * dot(Wi, Wr) + 0.5) , f0);
+// // Azimuth functions (N_R, N_TT, N_RTR)
+// float N_R(Surface surface, float cos_O2, float3 Wi, float3 Wr, float f0)
+// {
+//     // Fresnel part of the attentuation term (A in the papers)
+//     float fresnel = FresnelSchlick( sqrt(0.5 * dot(Wi, Wr) + 0.5) , f0);
 
-    // Distribution term
-    float distribution = 0.25 * cos_O2;
+//     // Distribution term
+//     float distribution = 0.25 * cos_O2;
 
-    // No absorption term since this is the reflected light path
-    return fresnel * distribution;
-}
+//     // No absorption term since this is the reflected light path
+//     return fresnel * distribution;
+// }
 
-// Light passes through the hair and exits at the back - most dominant effect
-// will be of lights at the back of the hair when the hair is thin and not concealed 
-float3 N_TT(Surface surface, float n2, float cos_O, float cos_O2, float3 cos_Ld, float f0)
-{
-    // Helper variables (see papers)
-    float a = rcp(n2);
-    float h = (1 + a * (0.6 - (0.8 * cos_O))) * cos_O2; 
+// // Light passes through the hair and exits at the back - most dominant effect
+// // will be of lights at the back of the hair when the hair is thin and not concealed 
+// float3 N_TT(Surface surface, float n2, float cos_O, float cos_O2, float3 cos_Ld, float f0)
+// {
+//     // Helper variables (see papers)
+//     float a = rcp(n2);
+//     float h = (1 + a * (0.6 - (0.8 * cos_O))) * cos_O2; 
 
-    // Fresnel part of the attentuation term (A in the papers)
-    float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
-    fresnel = Pow2(1 - fresnel);
+//     // Fresnel part of the attentuation term (A in the papers)
+//     float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
+//     fresnel = Pow2(1 - fresnel);
 
-    // The absorption part of the attenuation term (A in the papers).
-    float3 absorption = pow(surface.albedo, sqrt( 1 - (h*h*a*a) ) / (2 * cos_Ld) );
+//     // The absorption part of the attenuation term (A in the papers).
+//     float3 absorption = pow(surface.albedo, sqrt( 1 - (h*h*a*a) ) / (2 * cos_Ld) );
 
-    // Distribution term
-    float distribution = exp(-3.65 * cos_O - 3.98);
+//     // Distribution term
+//     float distribution = exp(-3.65 * cos_O - 3.98);
 
-    return absorption * (fresnel * distribution);
-}
+//     return absorption * (fresnel * distribution);
+// }
 
-float3 N_TRT(Surface surface, float cos_O, float3 cos_Ld, float f0)
-{
-    // Helper variables (see papers)
-    float h = sqrt(3.0f) * 0.5f;
+// float3 N_TRT(Surface surface, float cos_O, float3 cos_Ld, float f0)
+// {
+//     // Helper variables (see papers)
+//     float h = sqrt(3.0f) * 0.5f;
 
-    // Fresnel part of the attentuation term (A in the papers)
-    float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
-    fresnel = Pow2(1 - fresnel) * fresnel;
+//     // Fresnel part of the attentuation term (A in the papers)
+//     float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
+//     fresnel = Pow2(1 - fresnel) * fresnel;
 
-    // How much light the hair will absorb. Part of the attenuation term (A in the papers)
-    float3 absorption = pow(surface.albedo, 0.8f / max(cos_Ld, 0.001) );
+//     // How much light the hair will absorb. Part of the attenuation term (A in the papers)
+//     float3 absorption = pow(surface.albedo, 0.8f / max(cos_Ld, 0.001) );
 
-    // Distribution term
-    float distribution = exp(17.0f * cos_O - 16.78f);
+//     // Distribution term
+//     float distribution = exp(17.0f * cos_O - 16.78f);
 
-    return absorption * (fresnel * distribution);
-}
+//     return absorption * (fresnel * distribution);
+// }
 
 //------------------------------------------------------------------------------
 //                    The BSDF lighting function used by Hair
@@ -154,8 +152,8 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     float3 T = normalize(surface.tangent);             // Hair tangent
 
     // Incident light and reflection direction projected along the tangent
-    float Ti = T * dot(T, Wi);
-    float Tr = T * dot(T, Wr);
+    float3 Ti = T * dot(T, Wi);
+    float3 Tr = T * dot(T, Wr);
 
     // The light and reflection vectors projected along the normal plane to the hair.
     // The plane is spliting the Azimuth and Longtitude angles and vectors contributions.
@@ -176,10 +174,6 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     float Lh = (Lr + Li) * 0.5f;
     float Ld = (Lr - Li) * 0.5f;
 
-    // The folowing is according to the original article - reference only
-    //    float sinLiPlusSinLr = dot(Wi, NPi) * dot(Wr, NPr);// sin(Li) + sin(Lr);
-    float sinLiPlusSinLr = sin(Li) + sin(Lr);
-
     // Refraction index 
     const float n = 1.55f;
     float cos_Ld = cos(Ld);
@@ -194,49 +188,49 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     // R Path - single reflection from the hair towards the eye.
     if (o_enableMarschner_R)
     {
-        float lighting_R = o_enableLongtitudeCoeff ? M_R(surface, Lh, sinLiPlusSinLr) : 1.0f;
-        if (o_enableAzimuthCoeff)
-            lighting_R *= N_R(surface, cos_O2, Wi, Wr, f0);
+        float lighting_R = o_enableLongtitudeCoeff ? M_R(surface, Lh) : 1.0f;
+        //if (o_enableAzimuthCoeff)
+        //    lighting_R *= N_R(surface, cos_O2, Wi, Wr, f0);
 
         // The following lines are a cheap method to get occluded reflection by accoounting 
         // for the thickness if the reflection of light is going through the hair.
         // A reminder for this approximation - this is the R and not the TT lobe.
-        float lightToEye = saturate(-dot(Wi, Wr));
-        float selfOcclude = lightToEye * surface.thickness;
-        float lightTransferRatio = 1.0f - selfOcclude;
-        lightTransferRatio *= lightTransferRatio;
-        lighting_R *= lightTransferRatio;
+        //float lightToEye = saturate(-dot(Wi, Wr));
+        //float selfOcclude = lightToEye * surface.thickness;
+        //float lightTransferRatio = 1.0f - selfOcclude;
+        //lightTransferRatio *= lightTransferRatio;
+        //lighting_R *= lightTransferRatio;
 
         lighting += float3(lighting_R, lighting_R, lighting_R);
     }
 
-    // TT Path - ray passes through the hair.
-    // The ray from the eye is refracted into the hair, then refracted again through the 
-    // back of the hair.  The main contribution here would for thin hair areas from lights 
-    // behind the hair that are not concealed.  For thicker hair this contribution should
-    // be blocked by the head consealing the back light and by the thickness of the hair 
-    // that absorbs this energy over thick area hence reducing the energy pass based
-    // on the average thickness.
-    if (o_enableMarschner_TT)
-    {   
-        float3 lighting_TT = o_enableLongtitudeCoeff ? M_TT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
-        if (o_enableAzimuthCoeff)
-            lighting_TT *= N_TT(surface, n2, cos_O, cos_O2, cos_Ld, f0);
+    // // TT Path - ray passes through the hair.
+    // // The ray from the eye is refracted into the hair, then refracted again through the 
+    // // back of the hair.  The main contribution here would for thin hair areas from lights 
+    // // behind the hair that are not concealed.  For thicker hair this contribution should
+    // // be blocked by the head consealing the back light and by the thickness of the hair 
+    // // that absorbs this energy over thick area hence reducing the energy pass based
+    // // on the average thickness.
+    // if (o_enableMarschner_TT)
+    // {   
+    //     float3 lighting_TT = o_enableLongtitudeCoeff ? M_TT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
+    //     if (o_enableAzimuthCoeff)
+    //         lighting_TT *= N_TT(surface, n2, cos_O, cos_O2, cos_Ld, f0);
 
-        // Reduce back transmittance based on the thickness of the hair
-        lighting_TT *= (1.0f - surface.thickness);
-        lighting += lighting_TT;
-    }
+    //     // Reduce back transmittance based on the thickness of the hair
+    //     lighting_TT *= (1.0f - surface.thickness);
+    //     lighting += lighting_TT;
+    // }
 
-    // TRT Path - ray refracted into the hair, reflected back inside and exits (refracted)
-    // the hair towards the eye.
-    if (o_enableMarschner_TRT)
-    {
-        float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
-        if (o_enableAzimuthCoeff)
-            lighting_TRT *= N_TRT(surface, cos_O, cos_Ld, f0);
-        lighting += lighting_TRT;
-    }
+    // // TRT Path - ray refracted into the hair, reflected back inside and exits (refracted)
+    // // the hair towards the eye.
+    // if (o_enableMarschner_TRT)
+    // {
+    //     float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
+    //     if (o_enableAzimuthCoeff)
+    //         lighting_TRT *= N_TRT(surface, cos_O, cos_Ld, f0);
+    //     lighting += lighting_TRT;
+    // }
 
     return lighting;
 }

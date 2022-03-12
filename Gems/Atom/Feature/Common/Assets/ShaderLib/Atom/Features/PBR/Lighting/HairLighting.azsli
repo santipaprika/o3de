@@ -8,16 +8,19 @@
 
 #pragma once
 
+#define ENABLE_CLEAR_COAT       0
+#define ENABLE_TRANSMISSION     0
+
 // Include options first
 #include <Atom/Features/PBR/LightingOptions.azsli>
 
 // Then include custom surface and lighting data types
 #include <Atom/Features/PBR/Lighting/LightingData.azsli>
 #include <Atom/Features/PBR/Surfaces/HairSurface.azsli>
-#include <Atom/Features/PBR/Lighting/HairMarschner.azsli>
 
 #include <Atom/Features/PBR/LightingUtils.azsli>
 #include <Atom/Features/PBR/Microfacet/Brdf.azsli>
+#include <Atom/Features/PBR/Lighting/HairMarschner.azsli>
 
 // Then define the Diffuse and Specular lighting functions
 float3 GetDiffuseLighting(Surface surface, LightingData lightingData, float3 lightIntensity, float3 dirToLight)
@@ -25,27 +28,18 @@ float3 GetDiffuseLighting(Surface surface, LightingData lightingData, float3 lig
     // Based on http://www.graphics.stanford.edu/papers/hair/hair-sg03final.pdf
     
     // Inclination with respect to the normal plane of the direct illumination
-    float thetaI = dot(dirToLight, surface.normal); // NEED TANGENTS???
+    // float thetaI = dot(dirToLight, surface.normal); // NEED TANGENTS???
 
-    // Inclination with respect to the normal plane of the scattered direction being computed (path to camera)
-    float thetaR = dot(lightingData.dirToCamera, surface.normal);
+    // // Inclination with respect to the normal plane of the scattered direction being computed (path to camera)
+    // float thetaR = dot(lightingData.dirToCamera, surface.normal);
 
-    float halfAngle = (thetaI + thetaR) * 0.5;
+    // float halfAngle = (thetaI + thetaR) * 0.5;
     
     // Contribution of longitudinal scattering for the reflected lobe
     // float M_R = GaussianNormalized(surface.longitudinalRoughness, surface);
 
     
-    float3 diffuse;
-    if(o_enableSubsurfaceScattering)
-    {
-        // Use diffuse brdf contains double Fresnel (enter/exit surface) terms if subsurface scattering is enabled
-        diffuse = NormalizedDisneyDiffuse(surface.albedo, surface.normal, lightingData.dirToCamera, dirToLight, surface.roughnessLinear);
-    }
-    else
-    {
-        diffuse = DiffuseLambertian(surface.albedo, surface.normal, dirToLight, lightingData.diffuseResponse);
-    }
+    float3 diffuse = DiffuseLambertian(surface.albedo, surface.normal, dirToLight, lightingData.diffuseResponse);
     
     diffuse *= lightIntensity;
     return diffuse;
@@ -54,10 +48,10 @@ float3 GetDiffuseLighting(Surface surface, LightingData lightingData, float3 lig
 float3 GetSpecularLighting(Surface surface, LightingData lightingData, const float3 lightIntensity, const float3 dirToLight)
 {
     float3 specular = SpecularGGX(lightingData.dirToCamera, dirToLight, surface.normal, surface.specularF0, lightingData.NdotV, surface.roughnessA2, lightingData.multiScatterCompensation);
+    
+    specular = HairMarschnerBSDF(surface, lightingData, dirToLight);
     specular *= lightIntensity;
-
-
-
+    
     return specular;
 }
 
@@ -74,16 +68,15 @@ struct PbrLightingOutput
     float4 m_albedo;
     float4 m_specularF0;
     float4 m_normal;
-    float3 m_scatterDistance;
 };
 
 
-PbrLightingOutput GetPbrLightingOutput(Surface surface, LightingData lightingData)
+PbrLightingOutput GetPbrLightingOutput(Surface surface, LightingData lightingData, float alpha)
 {
     PbrLightingOutput lightingOutput;
 
-    lightingOutput.m_diffuseColor = float4(lightingData.diffuseLighting, 1.0f);
-    lightingOutput.m_specularColor = float4(lightingData.specularLighting, 1.0f);
+    lightingOutput.m_diffuseColor = float4(lightingData.diffuseLighting, alpha);
+    lightingOutput.m_specularColor = float4(lightingData.specularLighting, 1.0);
 
     // albedo, specularF0, roughness, and normals for later passes (specular IBL, Diffuse GI, SSR, AO, etc)
     lightingOutput.m_specularF0 = float4(surface.specularF0, surface.roughnessLinear);
@@ -93,4 +86,16 @@ PbrLightingOutput GetPbrLightingOutput(Surface surface, LightingData lightingDat
     lightingOutput.m_normal.a = o_specularF0_enableMultiScatterCompensation ? 1.0f : 0.0f;
     
     return lightingOutput;
+}
+
+PbrLightingOutput DebugOutput(float3 color)
+{
+    PbrLightingOutput output = (PbrLightingOutput)0;
+
+    float3 defaultNormal = float3(0.0f, 0.0f, 1.0f);
+
+    output.m_diffuseColor = float4(color.rgb, 1.0f);
+    output.m_normal.rgb = EncodeNormalSignedOctahedron(defaultNormal);
+
+    return output;
 }

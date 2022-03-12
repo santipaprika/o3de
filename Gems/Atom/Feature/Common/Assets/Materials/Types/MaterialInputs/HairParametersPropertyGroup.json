@@ -28,6 +28,19 @@
                 "type": "ShaderInput",
                 "name": "m_azimuthalRoughness"
             }
+        },
+        {
+            "name": "cuticleTilt",
+            "displayName": "Cuticle Tilt",
+            "description": "Tilt angle of the hair cuticle scales.",
+            "type": "float",
+            "defaultValue": 0.1,
+            "min": 0.0,
+            "softMax": 0.5,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_cuticleTilt"
+            }
         }
     ]
 }

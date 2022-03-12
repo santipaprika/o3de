@@ -15,32 +15,30 @@
 #include <Atom/Features/PBR/AlphaUtils.azsli>
 
 #include "MaterialInputs/BaseColorInput.azsli"
-#include "MaterialInputs/NormalInput.azsli"
 #include "MaterialInputs/RoughnessInput.azsli"
 #include "MaterialInputs/SpecularInput.azsli"
+#include "MaterialInputs/NormalInput.azsli"
 #include "MaterialInputs/OcclusionInput.azsli"
+#include "MaterialInputs/ParallaxInput.azsli"
 #include "MaterialInputs/UvSetCount.azsli"
-//#include "MaterialInputs/HairInput.azsli"
-#include "MaterialInputs/SubsurfaceInput.azsli"
-#include "MaterialInputs/TransmissionInput.azsli"
 
 ShaderResourceGroup MaterialSrg : SRG_PerMaterial
 {
     // Auto-generate material SRG fields for common inputs
     COMMON_SRG_INPUTS_BASE_COLOR()
-    COMMON_SRG_INPUTS_NORMAL()
     COMMON_SRG_INPUTS_ROUGHNESS()
     COMMON_SRG_INPUTS_SPECULAR_F0()
-    COMMON_SRG_INPUTS_OCCLUSION()
-    // COMMON_SRG_INPUTS_HAIR()
+    COMMON_SRG_INPUTS_NORMAL()
+    COMMON_SRG_INPUTS_OCCLUSION()     
+    COMMON_SRG_INPUTS_PARALLAX()
+    
+    uint m_parallaxUvIndex;
 
-    // UV parameters
     float3x3 m_uvMatrix;
     float4 m_pad1; // [GFX TODO][ATOM-14595] This is a workaround for a data stomping bug. Remove once it's fixed.
     float3x3 m_uvMatrixInverse;
     float4 m_pad2; // [GFX TODO][ATOM-14595] This is a workaround for a data stomping bug. Remove once it's fixed.
 
-    // Opacity parameters
     float m_opacityFactor;
     float m_opacityAffectsSpecularFactor;
     Texture2D m_opacityMap;
@@ -48,11 +46,12 @@ ShaderResourceGroup MaterialSrg : SRG_PerMaterial
 
     Sampler m_sampler
     {
-        AddressU = Clamp;
-        AddressV = Clamp;
+        AddressU = Wrap;
+        AddressV = Wrap;
         MinFilter = Linear;
         MagFilter = Linear;
         MipFilter = Linear;
+        MaxAnisotropy = 16;
     };
 
     Texture2D m_brdfMap;
@@ -66,26 +65,30 @@ ShaderResourceGroup MaterialSrg : SRG_PerMaterial
         MipFilter = Linear;
     };
 
-    // Parameters for subsurface scattering
-    float m_subsurfaceScatteringFactor;
-    float m_subsurfaceScatteringQuality;
-    float3 m_scatterDistance;
-    Texture2D m_subsurfaceScatteringInfluenceMap;
-    uint m_subsurfaceScatteringInfluenceMapUvIndex;
-
-    // Parameters for transmission
-    
-    // Elements of m_transmissionParams:
-    // Thick object mode: (attenuation coefficient, power, distortion, scale)
-    // Thin  object mode:  (shrinkFactor, transmissionNdLBias, distanceAttenuation, scale)
-    float4 m_transmissionParams;
-    
-    // (float3 TintColor, thickness)
-    float4 m_transmissionTintThickness;
-    Texture2D m_transmissionThicknessMap;
-    uint m_transmissionThicknessMapUvIndex;
-
     // Hair properties
     float m_longitudinalRoughness;
     float m_azimuthalRoughness;
+    float m_cuticleTilt;
+}
+
+// Callback function for ParallaxMapping.azsli
+DepthResult GetDepth(float2 uv, float2 uv_ddx, float2 uv_ddy)
+{
+    return SampleDepthFromHeightmap(MaterialSrg::m_heightmap, MaterialSrg::m_sampler, uv, uv_ddx, uv_ddy);
+}
+
+
+COMMON_OPTIONS_PARALLAX()
+
+bool ShouldHandleParallax()
+{
+    // Parallax mapping's non uniform uv transformations break screen space subsurface scattering, disable it when subsurface scattering is enabled.
+    return !o_enableSubsurfaceScattering && o_parallax_feature_enabled && o_useHeightmap;
+}
+
+bool ShouldHandleParallaxInDepthShaders()
+{
+    // The depth pass shaders need to calculate parallax when the result could affect the depth buffer, or when
+    // parallax could affect texel clipping.
+    return ShouldHandleParallax() && (o_parallax_enablePixelDepthOffset || o_opacity_mode == OpacityMode::Cutout);
 }

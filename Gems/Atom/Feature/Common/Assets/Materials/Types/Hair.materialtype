@@ -7,28 +7,28 @@
                 "$import": "MaterialInputs/BaseColorPropertyGroup.json"
             },
             {
-                "$import": "MaterialInputs/NormalPropertyGroup.json"
+                "$import": "MaterialInputs/RoughnessPropertyGroup.json"
             },
             { 
                 "$import": "MaterialInputs/HairParametersPropertyGroup.json"
             },
             { 
-                "$import": "MaterialInputs/RoughnessPropertyGroup.json"
-            },
-            { 
                 "$import": "MaterialInputs/SpecularPropertyGroup.json"
             },
             { 
+                "$import": "MaterialInputs/NormalPropertyGroup.json"
+            },
+            { 
                 "$import": "MaterialInputs/OcclusionPropertyGroup.json"
+            },
+            { 
+                "$import": "MaterialInputs/ParallaxPropertyGroup.json"
             },
             { 
                 "$import": "MaterialInputs/OpacityPropertyGroup.json"
             },
             { 
                 "$import": "MaterialInputs/UvPropertyGroup.json"
-            },
-            { 
-                "$import": "MaterialInputs/SubsurfaceAndTransmissionPropertyGroup.json"
             },
             { 
                 "$import": "MaterialInputs/GeneralCommonPropertyGroup.json"
@@ -38,6 +38,10 @@
     "shaders": [
         {
             "file": "./Hair.shader",
+            "tag": "ForwardPass"
+        },
+        {
+            "file": "./Hair_EDS.shader",
             "tag": "ForwardPass_EDS"
         },
         {
@@ -51,6 +55,23 @@
         {
             "file": "Shaders/MotionVector/MeshMotionVector.shader",
             "tag": "MeshMotionVector"
+        },
+        // Used by the light culling system to produce accurate depth bounds for this object when it uses blended transparency
+        {
+            "file": "Shaders/Depth/DepthPassTransparentMin.shader",
+            "tag": "DepthPassTransparentMin"
+        },
+        {
+            "file": "Shaders/Depth/DepthPassTransparentMax.shader",
+            "tag": "DepthPassTransparentMax"
+        }        
+    ],
+    "functors": [
+        {
+            "type": "Lua",
+            "args": {
+                "file": "StandardPBR_ShaderEnable.lua"
+            }
         }
     ],
     "uvNameMap": {

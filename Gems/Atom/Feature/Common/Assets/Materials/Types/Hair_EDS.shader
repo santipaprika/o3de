@@ -43,7 +43,7 @@
           "type": "Vertex"
         },
         {
-          "name": "HairPS",
+          "name": "HairPS_EDS",
           "type": "Fragment"
         }
       ]
