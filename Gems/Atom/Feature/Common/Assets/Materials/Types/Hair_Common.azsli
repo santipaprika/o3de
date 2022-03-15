@@ -69,6 +69,11 @@ ShaderResourceGroup MaterialSrg : SRG_PerMaterial
     float m_longitudinalRoughness;
     float m_azimuthalRoughness;
     float m_cuticleTilt;
+
+    // Weights
+    float m_longitudinalRFactor;
+    float m_longitudinalTTFactor;
+    float m_longitudinalTRTFactor;
 }
 
 // Callback function for ParallaxMapping.azsli

@@ -34,7 +34,7 @@ class Surface
     
     precise float3 position;    //!< Position in world-space
     float3 normal;              //!< Normal in world-space
-    float tangent;
+    float3 tangent;
     float3 vertexNormal;        //!< Vertex normal in world-space
     float3 baseColor;           //!< Surface base color
     float roughnessLinear;      //!< Perceptually linear roughness value authored by artists. Must be remapped to roughnessA before use

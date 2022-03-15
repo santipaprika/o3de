@@ -70,15 +70,19 @@ float M_TT(Surface surface, float Lh)
     float a = 1.0f * surface.cuticleTilt;
     float b = 0.5f * surface.roughnessA2;
 
-    return GaussianNormalized(Lh, a, b);
+    const float tiltFactor = -0.5f;   // Tilt is translate as the mean offset
+    const float roughnessFactor = 0.5f;    // Roughness is used as the standard deviation
+
+    return GaussianNormalized(Lh, tiltFactor * surface.cuticleTilt, roughnessFactor * surface.longitudinalRoughness);
 }
 
 float M_TRT(Surface surface, float Lh)
 {
-    float a = 1.5f * surface.cuticleTilt;
-    float b = 1.0f * surface.roughnessA2;
+    
+    const float tiltFactor = -1.5f;   // Tilt is translate as the mean offset
+    const float roughnessFactor = 2.0f;    // Roughness is used as the standard deviation
 
-    return GaussianNormalized(Lh, a, b);    
+    return surface.albedo * GaussianNormalized(Lh, tiltFactor * surface.cuticleTilt, roughnessFactor * surface.longitudinalRoughness);
 }
 
 
@@ -201,36 +205,37 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
         //lightTransferRatio *= lightTransferRatio;
         //lighting_R *= lightTransferRatio;
 
-        lighting += float3(lighting_R, lighting_R, lighting_R);
+        // [TODO] Factor as a temp to account for thickness
+        lighting += float3(lighting_R, lighting_R, lighting_R) * MaterialSrg::m_longitudinalRFactor;
     }
 
-    // // TT Path - ray passes through the hair.
-    // // The ray from the eye is refracted into the hair, then refracted again through the 
-    // // back of the hair.  The main contribution here would for thin hair areas from lights 
-    // // behind the hair that are not concealed.  For thicker hair this contribution should
-    // // be blocked by the head consealing the back light and by the thickness of the hair 
-    // // that absorbs this energy over thick area hence reducing the energy pass based
-    // // on the average thickness.
-    // if (o_enableMarschner_TT)
-    // {   
-    //     float3 lighting_TT = o_enableLongtitudeCoeff ? M_TT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
-    //     if (o_enableAzimuthCoeff)
-    //         lighting_TT *= N_TT(surface, n2, cos_O, cos_O2, cos_Ld, f0);
+    // TT Path - ray passes through the hair.
+    // The ray from the eye is refracted into the hair, then refracted again through the 
+    // back of the hair.  The main contribution here would for thin hair areas from lights 
+    // behind the hair that are not concealed.  For thicker hair this contribution should
+    // be blocked by the head consealing the back light and by the thickness of the hair 
+    // that absorbs this energy over thick area hence reducing the energy pass based
+    // on the average thickness.
+    if (o_enableMarschner_TT)
+    {   
+        float3 lighting_TT = o_enableLongtitudeCoeff ? M_TT(surface, Lh) : float3(1.0f, 1.0f, 1.0f);
+        // if (o_enableAzimuthCoeff)
+        //     lighting_TT *= N_TT(surface, n2, cos_O, cos_O2, cos_Ld, f0);
 
-    //     // Reduce back transmittance based on the thickness of the hair
-    //     lighting_TT *= (1.0f - surface.thickness);
-    //     lighting += lighting_TT;
-    // }
+        // Reduce back transmittance based on the thickness of the hair
+        // lighting_TT *= (1.0f - surface.thickness);
+        lighting += lighting_TT * MaterialSrg::m_longitudinalTTFactor;
+    }
 
-    // // TRT Path - ray refracted into the hair, reflected back inside and exits (refracted)
-    // // the hair towards the eye.
-    // if (o_enableMarschner_TRT)
-    // {
-    //     float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh, sinLiPlusSinLr) : float3(1.0f, 1.0f, 1.0f);
-    //     if (o_enableAzimuthCoeff)
-    //         lighting_TRT *= N_TRT(surface, cos_O, cos_Ld, f0);
-    //     lighting += lighting_TRT;
-    // }
+    // TRT Path - ray refracted into the hair, reflected back inside and exits (refracted)
+    // the hair towards the eye.
+    if (o_enableMarschner_TRT)
+    {
+        float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh) : float3(1.0f, 1.0f, 1.0f);
+        // if (o_enableAzimuthCoeff)
+        //     lighting_TRT *= N_TRT(surface, cos_O, cos_Ld, f0);
+        lighting += lighting_TRT * MaterialSrg::m_longitudinalTRTFactor;
+    }
 
     return lighting;
 }

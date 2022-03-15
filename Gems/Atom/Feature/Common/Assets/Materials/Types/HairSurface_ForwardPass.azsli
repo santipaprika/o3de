@@ -97,21 +97,18 @@ PbrLightingOutput HairPS_Common(VSOutput IN, bool isFrontFace, out float depthND
     float3 tangents[UvSetCount] = { IN.m_tangent, IN.m_tangent };
     float3 bitangents[UvSetCount] = { IN.m_bitangent, IN.m_bitangent };
 
-    if (ShouldHandleParallax() || o_normal_useTexture)
+    for (int i = 0; i != UvSetCount; ++i)
     {
-        for (int i = 0; i != UvSetCount; ++i)
-        {
-            EvaluateTangentFrame(
-                IN.m_normal,
-                IN.m_worldPosition, 
-                isFrontFace,
-                IN.m_uv[i],
-                i,
-                IN.m_tangent,
-                IN.m_bitangent,
-                tangents[i],
-                bitangents[i]);
-        }
+        EvaluateTangentFrame(
+            IN.m_normal,
+            IN.m_worldPosition, 
+            isFrontFace,
+            IN.m_uv[i],
+            i,
+            IN.m_tangent,
+            IN.m_bitangent,
+            tangents[i],
+            bitangents[i]);
     }
 
     // ------- Depth & Parallax -------
@@ -147,7 +144,7 @@ PbrLightingOutput HairPS_Common(VSOutput IN, bool isFrontFace, out float depthND
     Surface surface;
     surface.vertexNormal = vertexNormal;
     surface.position = IN.m_worldPosition.xyz;
-    surface.tangent = IN.m_bitangent;
+    surface.tangent = bitangents[1];
 
     // ------- Alpha & Clip -------
     // TODO: this often invokes a separate sample of the base color texture which is wasteful

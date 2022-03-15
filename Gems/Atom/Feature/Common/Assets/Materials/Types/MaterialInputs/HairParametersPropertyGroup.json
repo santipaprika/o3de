@@ -8,9 +8,9 @@
             "displayName": "Longitudinal Roughness",
             "description": "Roughness for the longitudinal scattering in hair strands.",
             "type": "float",
-            "defaultValue": 1.0,
+            "defaultValue": 0.09,
             "min": 0.0,
-            "softMax": 2.0,
+            "softMax": 0.4,
             "connection": {
                 "type": "ShaderInput",
                 "name": "m_longitudinalRoughness"
@@ -21,9 +21,9 @@
             "displayName": "Azimuthal Roughness",
             "description": "Roughness for the azimuthal scattering in hair strands.",
             "type": "float",
-            "defaultValue": 1.0,
+            "defaultValue": 0.09,
             "min": 0.0,
-            "softMax": 2.0,
+            "softMax": 0.4,
             "connection": {
                 "type": "ShaderInput",
                 "name": "m_azimuthalRoughness"
@@ -34,12 +34,51 @@
             "displayName": "Cuticle Tilt",
             "description": "Tilt angle of the hair cuticle scales.",
             "type": "float",
-            "defaultValue": 0.1,
-            "min": 0.0,
+            "defaultValue": -0.09,
+            "min": -0.5,
             "softMax": 0.5,
             "connection": {
                 "type": "ShaderInput",
                 "name": "m_cuticleTilt"
+            }
+        },
+        {
+            "name": "longitudinalRFactor",
+            "displayName": "Longitudinal R Factor",
+            "description": "Weight for the longitudinal R lobe.",
+            "type": "float",
+            "defaultValue": 0.5,
+            "min": 0.0,
+            "softMax": 1.0,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_longitudinalRFactor"
+            }
+        },
+        {
+            "name": "longitudinalTTFactor",
+            "displayName": "Longitudinal TT Factor",
+            "description": "Weight for the longitudinal TT lobe.",
+            "type": "float",
+            "defaultValue": 0.5,
+            "min": 0.0,
+            "softMax": 1.0,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_longitudinalTTFactor"
+            }
+        },
+        {
+            "name": "longitudinalTRTFactor",
+            "displayName": "Longitudinal TRT Factor",
+            "description": "Weight for the longitudinal TRT lobe.",
+            "type": "float",
+            "defaultValue": 0.5,
+            "min": 0.0,
+            "softMax": 1.0,
+            "connection": {
+                "type": "ShaderInput",
+                "name": "m_longitudinalTRTFactor"
             }
         }
     ]
