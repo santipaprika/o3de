@@ -99,44 +99,44 @@ float N_R(Surface surface, float cosHalfPhi, float3 Wi, float3 Wr, float f0)
     return fresnel * distribution;
 }
 
-// // Light passes through the hair and exits at the back - most dominant effect
-// // will be of lights at the back of the hair when the hair is thin and not concealed 
-// float3 N_TT(Surface surface, float n2, float cos_O, float cos_O2, float3 cos_Ld, float f0)
-// {
-//     // Helper variables (see papers)
-//     float a = rcp(n2);
-//     float h = (1 + a * (0.6 - (0.8 * cos_O))) * cos_O2; 
+// Light passes through the hair and exits at the back - most dominant effect
+// will be of lights at the back of the hair when the hair is thin and not concealed 
+float3 N_TT(Surface surface, float n2, float cosPhi, float cosHalfPhi, float3 cos_Ld, float f0)
+{
+    // Helper variables (see papers)
+    float a = rcp(n2);
+    float h = (1 + a * (0.6 - (0.8 * cosPhi))) * cosHalfPhi; 
 
-//     // Fresnel part of the attentuation term (A in the papers)
-//     float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
-//     fresnel = Pow2(1 - fresnel);
+    // Fresnel part of the attentuation term (A in the papers)
+    float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
+    fresnel = Pow2(1 - fresnel);
 
-//     // The absorption part of the attenuation term (A in the papers).
-//     float3 absorption = pow(surface.albedo, sqrt( 1 - (h*h*a*a) ) / (2 * cos_Ld) );
+    // The absorption part of the attenuation term (A in the papers).
+    float3 absorption = pow(surface.albedo, sqrt( 1 - (h*h*a*a) ) / (2 * cos_Ld) );
 
-//     // Distribution term
-//     float distribution = exp(-3.65 * cos_O - 3.98);
+    // Distribution term
+    float distribution = exp(-3.65 * cosPhi - 3.98);
 
-//     return absorption * (fresnel * distribution);
-// }
+    return absorption * (fresnel * distribution);
+}
 
-// float3 N_TRT(Surface surface, float cos_O, float3 cos_Ld, float f0)
-// {
-//     // Helper variables (see papers)
-//     float h = sqrt(3.0f) * 0.5f;
+float3 N_TRT(Surface surface, float cosPhi, float3 cos_Ld, float f0)
+{
+    // Helper variables (see papers)
+    float h = sqrt(3.0f) * 0.5f;
 
-//     // Fresnel part of the attentuation term (A in the papers)
-//     float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
-//     fresnel = Pow2(1 - fresnel) * fresnel;
+    // Fresnel part of the attentuation term (A in the papers)
+    float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
+    fresnel = Pow2(1 - fresnel) * fresnel;
 
-//     // How much light the hair will absorb. Part of the attenuation term (A in the papers)
-//     float3 absorption = pow(surface.albedo, 0.8f / max(cos_Ld, 0.001) );
+    // How much light the hair will absorb. Part of the attenuation term (A in the papers)
+    float3 absorption = pow(surface.albedo, 0.8f / max(cos_Ld, 0.001) );
 
-//     // Distribution term
-//     float distribution = exp(17.0f * cos_O - 16.78f);
+    // Distribution term
+    float distribution = exp(17.0f * cosPhi - 16.78f);
 
-//     return absorption * (fresnel * distribution);
-// }
+    return absorption * (fresnel * distribution);
+}
 
 //------------------------------------------------------------------------------
 //                    The BSDF lighting function used by Hair
@@ -219,8 +219,8 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     if (o_enableMarschner_TT)
     {   
         float3 lighting_TT = o_enableLongtitudeCoeff ? M_TT(surface, Lh) : float3(1.0f, 1.0f, 1.0f);
-        // if (o_enableAzimuthCoeff)
-        //     lighting_TT *= N_TT(surface, n2, cos_O, cos_O2, cos_Ld, f0);
+        if (o_enableAzimuthCoeff)
+            lighting_TT *= N_TT(surface, n2, cosPhi, cosHalfPhi, cos_Ld, f0);
 
         // Reduce back transmittance based on the thickness of the hair
         // lighting_TT *= (1.0f - surface.thickness);
@@ -232,8 +232,8 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     if (o_enableMarschner_TRT)
     {
         float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh) : float3(1.0f, 1.0f, 1.0f);
-        // if (o_enableAzimuthCoeff)
-        //     lighting_TRT *= N_TRT(surface, cos_O, cos_Ld, f0);
+        if (o_enableAzimuthCoeff)
+            lighting_TRT *= N_TRT(surface, cosPhi, cos_Ld, f0);
         lighting += lighting_TRT * MaterialSrg::m_longitudinalTRTFactor;
     }
 

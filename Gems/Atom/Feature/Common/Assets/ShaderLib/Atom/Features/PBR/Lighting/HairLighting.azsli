@@ -39,17 +39,17 @@ float3 GetDiffuseLighting(Surface surface, LightingData lightingData, float3 lig
     // float M_R = GaussianNormalized(surface.longitudinalRoughness, surface);
 
     
-    float3 diffuse = DiffuseLambertian(surface.albedo, surface.normal, dirToLight, lightingData.diffuseResponse);
+    //float3 diffuse = DiffuseLambertian(surface.albedo, surface.normal, dirToLight, lightingData.diffuseResponse);
     
-    diffuse *= lightIntensity;
+    float3 diffuse = float3(0,0,0);
     return diffuse;
 }
 
 float3 GetSpecularLighting(Surface surface, LightingData lightingData, const float3 lightIntensity, const float3 dirToLight)
 {
-    float3 specular = SpecularGGX(lightingData.dirToCamera, dirToLight, surface.normal, surface.specularF0, lightingData.NdotV, surface.roughnessA2, lightingData.multiScatterCompensation);
+    //float3 specular = SpecularGGX(lightingData.dirToCamera, dirToLight, surface.normal, surface.specularF0, lightingData.NdotV, surface.roughnessA2, lightingData.multiScatterCompensation);
     
-    specular = HairMarschnerBSDF(surface, lightingData, dirToLight);
+    float3 specular = HairMarschnerBSDF(surface, lightingData, dirToLight);
     specular *= lightIntensity;
     
     return specular;
