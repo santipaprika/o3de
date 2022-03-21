@@ -82,22 +82,22 @@ float M_TRT(Surface surface, float Lh)
     const float tiltFactor = -1.5f;   // Tilt is translate as the mean offset
     const float roughnessFactor = 2.0f;    // Roughness is used as the standard deviation
 
-    return surface.albedo * GaussianNormalized(Lh, tiltFactor * surface.cuticleTilt, roughnessFactor * surface.longitudinalRoughness);
+    return GaussianNormalized(Lh, tiltFactor * surface.cuticleTilt, roughnessFactor * surface.longitudinalRoughness);
 }
 
 
-// // Azimuth functions (N_R, N_TT, N_RTR)
-// float N_R(Surface surface, float cos_O2, float3 Wi, float3 Wr, float f0)
-// {
-//     // Fresnel part of the attentuation term (A in the papers)
-//     float fresnel = FresnelSchlick( sqrt(0.5 * dot(Wi, Wr) + 0.5) , f0);
+// Azimuth functions (N_R, N_TT, N_RTR)
+float N_R(Surface surface, float cosHalfPhi, float3 Wi, float3 Wr, float f0)
+{
+    // Fresnel part of the attentuation term (A in the papers)
+    float fresnel = FresnelSchlick( sqrt(0.5 * dot(Wi, Wr) + 0.5) , f0);
 
-//     // Distribution term
-//     float distribution = 0.25 * cos_O2;
+    // Distribution term
+    float distribution = 0.25 * cosHalfPhi;
 
-//     // No absorption term since this is the reflected light path
-//     return fresnel * distribution;
-// }
+    // No absorption term since this is the reflected light path
+    return fresnel * distribution;
+}
 
 // // Light passes through the hair and exits at the back - most dominant effect
 // // will be of lights at the back of the hair when the hair is thin and not concealed 
@@ -166,11 +166,11 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
 
     // Azimuthal angle between the incident light vector and the reflection 
     // direction (the direction at which we measure the light scaterring)
-    // float O = acos(dot(NPi, NPr))  <- Unused, for reference only
-    float cos_O = dot(NPi, NPr);
+    // float Phi = acos(dot(NPi, NPr))  <- Unused, for reference only
+    float cosPhi = dot(NPi, NPr);
 
     // cosine(O / 2)
-    float cos_O2 = sqrt(0.5 * cos_O + 0.5);  // <- trigonometric formula for calculating cos(x/2) given cos(x) 
+    float cosHalfPhi = sqrt(0.5 * cosPhi + 0.5);  // <- trigonometric formula for calculating cos(x/2) given cos(x) 
 
     // Longitude angles
     float Li = acos(clamp(dot(Wi, NPi),-1.0f, 1.0f));
@@ -193,8 +193,8 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     if (o_enableMarschner_R)
     {
         float lighting_R = o_enableLongtitudeCoeff ? M_R(surface, Lh) : 1.0f;
-        //if (o_enableAzimuthCoeff)
-        //    lighting_R *= N_R(surface, cos_O2, Wi, Wr, f0);
+        if (o_enableAzimuthCoeff)
+            lighting_R *= N_R(surface, cosHalfPhi, Wi, Wr, f0);
 
         // The following lines are a cheap method to get occluded reflection by accoounting 
         // for the thickness if the reflection of light is going through the hair.
