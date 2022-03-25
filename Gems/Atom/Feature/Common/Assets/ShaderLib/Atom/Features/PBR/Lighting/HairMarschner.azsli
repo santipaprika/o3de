@@ -67,9 +67,6 @@ float M_R(Surface surface, float Lh)
 
 float M_TT(Surface surface, float Lh)
 {
-    float a = 1.0f * surface.cuticleTilt;
-    float b = 0.5f * surface.roughnessA2;
-
     const float tiltFactor = -0.5f;   // Tilt is translate as the mean offset
     const float roughnessFactor = 0.5f;    // Roughness is used as the standard deviation
 
@@ -120,22 +117,28 @@ float3 N_TT(Surface surface, float n2, float cosPhi, float cosHalfPhi, float3 co
     return absorption * (fresnel * distribution);
 }
 
-float3 N_TRT(Surface surface, float cosPhi, float3 cos_Ld, float f0)
+float3 N_TRT(Surface surface, float n2, float cosPhi, float3 cos_Ld, float f0)
 {
+    float scale = 1.5*(1.0-surface.azimuthalRoughness);
+
     // Helper variables (see papers)
     float h = sqrt(3.0f) * 0.5f;
 
     // Fresnel part of the attentuation term (A in the papers)
     float fresnel = FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ), f0);
-    fresnel = Pow2(1 - fresnel) * fresnel;
+
+    // should be gamma_t, not gamma_i!
+    // f0_inv = -f0
+    // fresnel = Pow2(1 - fresnel) * FresnelSchlick(cos_Ld * sqrt( 1 - (h*h) ) * n2, -f0);
 
     // How much light the hair will absorb. Part of the attenuation term (A in the papers)
     float3 absorption = pow(surface.albedo, 0.8f / max(cos_Ld, 0.001) );
 
     // Distribution term
     float distribution = exp(17.0f * cosPhi - 16.78f);
-
-    return absorption * (fresnel * distribution);
+    
+    return absorption * distribution * fresnel;
+    //return float3(1,1,1) * fresnel;
 }
 
 //------------------------------------------------------------------------------
@@ -233,9 +236,9 @@ float3 HairMarschnerBSDF(Surface surface, LightingData lightingData, const float
     {
         float3 lighting_TRT = o_enableLongtitudeCoeff ? M_TRT(surface, Lh) : float3(1.0f, 1.0f, 1.0f);
         if (o_enableAzimuthCoeff)
-            lighting_TRT *= N_TRT(surface, cosPhi, cos_Ld, f0);
+            lighting_TRT *= N_TRT(surface, n2, cosPhi, cos_Ld, f0);
         lighting += lighting_TRT * MaterialSrg::m_longitudinalTRTFactor;
     }
 
-    return lighting;
+    return lighting / (cos_Ld * cos_Ld);
 }

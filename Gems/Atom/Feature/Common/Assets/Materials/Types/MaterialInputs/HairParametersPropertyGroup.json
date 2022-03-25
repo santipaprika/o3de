@@ -21,7 +21,7 @@
             "displayName": "Azimuthal Roughness",
             "description": "Roughness for the azimuthal scattering in hair strands.",
             "type": "float",
-            "defaultValue": 0.09,
+            "defaultValue": 0.065,
             "min": 0.0,
             "softMax": 0.4,
             "connection": {
@@ -47,7 +47,7 @@
             "displayName": "Longitudinal R Factor",
             "description": "Weight for the longitudinal R lobe.",
             "type": "float",
-            "defaultValue": 0.5,
+            "defaultValue": 1.0,
             "min": 0.0,
             "softMax": 1.0,
             "connection": {
@@ -60,7 +60,7 @@
             "displayName": "Longitudinal TT Factor",
             "description": "Weight for the longitudinal TT lobe.",
             "type": "float",
-            "defaultValue": 0.5,
+            "defaultValue": 1.0,
             "min": 0.0,
             "softMax": 1.0,
             "connection": {
@@ -73,7 +73,7 @@
             "displayName": "Longitudinal TRT Factor",
             "description": "Weight for the longitudinal TRT lobe.",
             "type": "float",
-            "defaultValue": 0.5,
+            "defaultValue": 1.0,
             "min": 0.0,
             "softMax": 1.0,
             "connection": {
